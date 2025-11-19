@@ -55,7 +55,9 @@ MODULE MOD_COSP_Modis_INTERFACE
           sunlit,         & ! Sunlit scenes
           notSunlit         ! Dark scenes
      real(wp),allocatable,dimension(:,:) :: &
-          pres              ! Gridmean pressure at layer edges (Pa) 
+          pres,           &  ! Gridmean pressure at layer edges (Pa) 
+          mpres,          &  ! Gridmean pressure mid-layer edges (Pa)
+          ta                ! Atmospheric temperature
      real(wp),pointer ::  &
           tau(:,:,:),     & ! Subcolumn optical thickness @ 0.67 microns.
           liqFrac(:,:,:), & ! Liquid water fraction
