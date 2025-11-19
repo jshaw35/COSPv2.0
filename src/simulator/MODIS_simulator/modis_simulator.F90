@@ -111,9 +111,10 @@ contains
   !       and reverts to a thermal algorithm much like ISCCP's. Rather than replicate that 
   !       alogrithm in this simulator we simply report the values from the ISCCP simulator. 
   ! ########################################################################################
-  subroutine modis_subcolumn(nSubCols, nLevels, pressureLevels, optical_thickness,       & 
-                         tauLiquidFraction, g, w0,isccpCloudTopPressure,                 &
-                         retrievedPhase, retrievedCloudTopPressure,                      &
+  subroutine modis_subcolumn(nSubCols, nLevels, pressureLevels, mpressureLevels, optical_thickness,       & ! JKS added mpressureLevels
+                         tauLiquidFraction, g, w0, ta, isccpCloudTopPressure,            & ! JKS added ta
+                         retrievedPhase, retrievedCloudTopPressure,                      & 
+                         retrievedCloudTopTemp,                                          & ! JKS new TCT subcolumn output
                          retrievedTau,   retrievedSize)
 
     ! INPUTS
@@ -121,7 +122,10 @@ contains
          nSubCols,                  & ! Number of subcolumns
          nLevels                      ! Number of levels         
     real(wp),dimension(nLevels+1),intent(in) :: &
-         pressureLevels               ! Gridmean pressure at layer edges (Pa)                  
+         pressureLevels               ! Gridmean pressure at layer edges (Pa)    
+    real(wp),dimension(nLevels),intent(in) :: &
+         ta,                        & ! Gridmean temperature at layer (K) ! JKS            
+         mpressureLevels              ! Gridmean pressure at midlayer (K) ! JKS            
     real(wp),dimension(nSubCols,nLevels),intent(in) :: &
          optical_thickness,         & ! Subcolumn optical thickness @ 0.67 microns.
          tauLiquidFraction,         & ! Liquid water fraction
@@ -135,18 +139,24 @@ contains
          retrievedPhase               ! MODIS retrieved phase (liquid/ice/other)              
     real(wp),dimension(nSubCols), intent(inout) :: &
          retrievedCloudTopPressure, & ! MODIS retrieved CTP (Pa)
+         retrievedCloudTopTemp,     & ! MODIS retrieved CTT (K) ! JKS added
          retrievedTau,              & ! MODIS retrieved optical depth (unitless)              
          retrievedSize                ! MODIS retrieved particle size (microns)              
 
     ! LOCAL VARIABLES
     logical, dimension(nSubCols)      :: &
+         ISCCPMask,                      & ! JKS, ??
          cloudMask
     real(wp)                          :: &
+         deltaP,                         &
+         incrP,                          &
+         tempProduct,                    &
          integratedLiquidFraction,       &
          obs_Refl_nir
     real(wp),dimension(num_trial_res) :: &
          predicted_Refl_nir
     integer                           :: &
+         j,                              &
          i
 
     ! ########################################################################################
@@ -162,6 +172,9 @@ contains
     ! ########################################################################################
     cloudMask = retrievedTau(1:nSubCols) >= min_OpticalThickness
     
+    ! JKS
+    ISCCPMask = .False. ! Mask for ISCCP pressure tops
+
     do i = 1, nSubCols
        if(cloudMask(i)) then 
           ! ##################################################################################
@@ -170,11 +183,10 @@ contains
           ! methods for clouds lower than that. For CO2 slicing we report the optical-depth
           ! weighted pressure, integrating to a specified optical depth.
           ! This assumes linear variation in p between levels. Linear in ln(p) is probably 
-          ! better, though we'd need to deal with the lowest pressure gracefully. 
+          ! better, though we'd need to deal with the lowest pressure gracefully.
           ! ##################################################################################
           retrievedCloudTopPressure(i) = cloud_top_pressure(nLevels,(/ 0._wp, optical_thickness(i,1:nLevels) /), &
                                                             pressureLevels(1:nLevels),CO2Slicing_TauLimit)  
-        
           ! ##################################################################################
           !                               Phase determination 
           ! Determine fraction of total tau that's liquid when ice and water contribute about 
@@ -217,6 +229,7 @@ contains
        else   
           ! Values when we don't think there's a cloud. 
           retrievedCloudTopPressure(i) = R_UNDEF 
+          retrievedCloudTopTemp(i)     = R_UNDEF ! JKS
           retrievedPhase(i)            = phaseIsNone
           retrievedSize(i)             = R_UNDEF 
           retrievedTau(i)              = R_UNDEF 
@@ -230,17 +243,51 @@ contains
     ! Of course, ISCCP cloud top pressures are in mb.   
     where(cloudMask(1:nSubCols) .and. retrievedCloudTopPressure(1:nSubCols) > CO2Slicing_PressureLimit) &
          retrievedCloudTopPressure(1:nSubCols) = isccpCloudTopPressure! * 100._wp
+         ISCCPMask(1:nSubCols) = .True. ! Mark when ISCCP pressure is used
+
+     ! JKS interpolate PCT to TCT
+     do i = 1, nSubCols ! iterate over subcolumns
+        if(cloudMask(i)) then ! check if cloudy
+           do j = 2, nLevels ! iterate over vertical levels, looking backwards
+               if (retrievedCloudTopPressure(i) .lt. mpressureLevels(1)) then
+                  ! handle situation where CTP less than the lowest midlevel
+                  deltaP = mpressureLevels(2) - mpressureLevels(1) ! The adjacent pressure level, positive
+                  incrP = mpressureLevels(1) - retrievedCloudTopPressure(i) ! distance from the highest midpoint, positive
+                  tempProduct = ta(1) - (ta(2) - ta(1)) * log(incrP) / log(deltaP) ! linear interpolation, switched slope sign so log will work
+                  retrievedCloudTopTemp(i) = tempProduct
+                  exit
+               end if
+               if (retrievedCloudTopPressure(i) .gt. mpressureLevels(nLevels)) then
+                  ! handle situation where CTP greater than the highest midlevel
+                  deltaP = mpressureLevels(nLevels) - mpressureLevels(nLevels-1) ! The adjacent pressure level, positive
+                  incrP = retrievedCloudTopPressure(i) - mpressureLevels(nLevels) ! distance from the highest midpoint, positive
+                  tempProduct = ta(nLevels) + (ta(nLevels) - ta(nLevels-1)) * log(incrP) / log(deltaP) ! linear interpolation
+                  retrievedCloudTopTemp(i) = tempProduct
+                  exit
+               end if
+               ! Desired case where the target level is bracketed by midlevels
+               if (retrievedCloudTopPressure(i) .ge. mpressureLevels(j-1) .and. &
+                  retrievedCloudTopPressure(i) .le. mpressureLevels(j)) then ! assume pressure increases with index, moving down
+                  deltaP = mpressureLevels(j) - mpressureLevels(j-1) ! pressure increases, so this is positive
+                  incrP = retrievedCloudTopPressure(i) - mpressureLevels(j-1) ! 0 if at j-1, deltaP if at j, positive
+                  tempProduct = ta(j-1) + (ta(j) - ta(j-1)) * log(incrP) / log(deltaP) ! linear interpolation
+                  retrievedCloudTopTemp(i) = tempProduct
+                  exit
+               end if
+           end do
+        end if
+     end do
     
   end subroutine modis_subcolumn
 
   ! ########################################################################################
-  subroutine modis_column(nPoints,nSubCols,phase, cloud_top_pressure, optical_thickness, particle_size,     &
+  subroutine modis_column(nPoints,nSubCols,phase, cloud_top_pressure, optical_thickness, cloud_top_temp, particle_size,     & ! JKS added TCT
        Cloud_Fraction_Total_Mean,         Cloud_Fraction_Water_Mean,         Cloud_Fraction_Ice_Mean,        &
        Cloud_Fraction_High_Mean,          Cloud_Fraction_Mid_Mean,           Cloud_Fraction_Low_Mean,        &
        Optical_Thickness_Total_Mean,      Optical_Thickness_Water_Mean,      Optical_Thickness_Ice_Mean,     &
        Optical_Thickness_Total_MeanLog10, Optical_Thickness_Water_MeanLog10, Optical_Thickness_Ice_MeanLog10,&
        Cloud_Particle_Size_Water_Mean,    Cloud_Particle_Size_Ice_Mean,      Cloud_Top_Pressure_Total_Mean,  &
-       Liquid_Water_Path_Mean,            Ice_Water_Path_Mean,                                               &    
+       Liquid_Water_Path_Mean,            Cloud_Top_Temp_Total_Mean,         Ice_Water_Path_Mean,            &    ! JKS adding Cloud_Top_Temp_Total_Mean
        Optical_Thickness_vs_Cloud_Top_Pressure,Optical_Thickness_vs_ReffIce,Optical_Thickness_vs_ReffLiq)
     
     ! INPUTS
@@ -251,6 +298,7 @@ contains
          phase                             
     real(wp),intent(in),dimension(nPoints, nSubCols) ::  &
          cloud_top_pressure,                &
+         cloud_top_temp,                    & ! JKS added
          optical_thickness,                 &
          particle_size
  
@@ -272,6 +320,7 @@ contains
          Cloud_Particle_Size_Ice_Mean,      & !
          Cloud_Top_Pressure_Total_Mean,     & !
          Liquid_Water_Path_Mean,            & !
+         Cloud_Top_Temp_Total_Mean,         & ! JKS
          Ice_Water_Path_Mean                  !
     real(wp),intent(inout),dimension(nPoints,numMODISTauBins,numMODISPresBins) :: &
          Optical_Thickness_vs_Cloud_Top_Pressure
@@ -359,6 +408,8 @@ contains
        Ice_Water_Path_Mean               = R_UNDEF
     endwhere
     Cloud_Top_Pressure_Total_Mean  = sum(cloud_top_pressure, mask = cloudMask, dim = 2) / &
+                                     max(1, count(cloudMask, dim = 2))
+    Cloud_Top_Temp_Total_Mean      = sum(cloud_top_temp, mask = cloudMask, dim = 2) / &
                                      max(1, count(cloudMask, dim = 2))
 
     ! ########################################################################################
