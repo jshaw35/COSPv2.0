@@ -1018,6 +1018,8 @@ CONTAINS
             flag_xyfill=.true., fill_value=R_UNDEF)
        ! float pctmodis ( time, loc )
        call addfld ('PCTMODIS',horiz_only,'A','Pa','MODIS Cloud Top Pressure*CLTMODIS',flag_xyfill=.true., fill_value=R_UNDEF)
+       ! float tctmodis ( time, loc ) ! JKS
+       call addfld ('TCTMODIS',horiz_only,'A','K','MODIS Cloud Top Temperature*CLTMODIS',flag_xyfill=.true., fill_value=R_UNDEF) ! JKS
        ! float lwpmodis ( time, loc )
        call addfld ('LWPMODIS',horiz_only,'A','kg m-2','MODIS Cloud Liquid Water Path*CLWMODIS',                    &
             flag_xyfill=.true., fill_value=R_UNDEF)
@@ -1049,6 +1051,7 @@ CONTAINS
        call add_default ('REFFCLWMODIS',cosp_histfile_num,' ')
        call add_default ('REFFCLIMODIS',cosp_histfile_num,' ')
        call add_default ('PCTMODIS',cosp_histfile_num,' ')
+       call add_default ('TCTMODIS',cosp_histfile_num,' ') ! JKS
        call add_default ('LWPMODIS',cosp_histfile_num,' ')
        call add_default ('IWPMODIS',cosp_histfile_num,' ')
        call add_default ('CLMODIS',cosp_histfile_num,' ')
@@ -1346,7 +1349,7 @@ CONTAINS
     integer, parameter :: nf_calipso=44                  ! number of calipso outputs (28 w/o OPAQ, 44 w/ OPAQ)
     integer, parameter :: nf_isccp=9                     ! number of isccp outputs
     integer, parameter :: nf_misr=1                      ! number of misr outputs
-    integer, parameter :: nf_modis=20                    ! number of modis outputs
+    integer, parameter :: nf_modis=21                    ! number of modis outputs ! JKS
     
     ! Cloudsat outputs
     character(len=max_fieldname_len),dimension(nf_radar),parameter ::          &
@@ -1385,7 +1388,7 @@ CONTAINS
                        'CLLMODIS    ','TAUTMODIS   ','TAUWMODIS   ','TAUIMODIS   ','TAUTLOGMODIS',&
                        'TAUWLOGMODIS','TAUILOGMODIS','REFFCLWMODIS','REFFCLIMODIS',&
                        'PCTMODIS    ','LWPMODIS    ','IWPMODIS    ','CLMODIS     ','CLRIMODIS   ',&
-                       'CLRLMODIS   '/)
+                       'CLRLMODIS   ','TCTMODIS.   '/) ! JKS
     
     logical :: run_radar(nf_radar,pcols)                 ! logical telling you if you should run radar simulator
     logical :: run_calipso(nf_calipso,pcols)                 ! logical telling you if you should run calipso simulator
@@ -1538,6 +1541,7 @@ CONTAINS
     real(r8) :: reffclwmodis(pcols)
     real(r8) :: reffclimodis(pcols)
     real(r8) :: pctmodis(pcols)
+    real(r8) :: tctmodis(pcols) ! JKS
     real(r8) :: lwpmodis(pcols)
     real(r8) :: iwpmodis(pcols)
     real(r8) :: clmodis_cam(pcols,ntau_cosp_modis*nprs_cosp)
@@ -1671,6 +1675,7 @@ CONTAINS
     reffclwmodis(1:pcols)                            = R_UNDEF
     reffclimodis(1:pcols)                            = R_UNDEF
     pctmodis(1:pcols)                                = R_UNDEF
+    tctmodis(1:pcols)                                = R_UNDEF ! JKS
     lwpmodis(1:pcols)                                = R_UNDEF
     iwpmodis(1:pcols)                                = R_UNDEF
     clmodis_cam(1:pcols,1:ntau_cosp_modis*nprs_cosp) = R_UNDEF
@@ -2229,6 +2234,7 @@ CONTAINS
              cospOUT%modis_Cloud_Particle_Size_Water_Mean(1:ncol)  = R_UNDEF
              cospOUT%modis_Cloud_Particle_Size_Ice_Mean(1:ncol)    = R_UNDEF
              cospOUT%modis_Cloud_Top_Pressure_Total_Mean(1:ncol)   = R_UNDEF
+             cospOUT%modis_Cloud_Top_Temp_Total_Mean(1:ncol)       = R_UNDEF ! JKS
              cospOUT%modis_Liquid_Water_Path_Mean(1:ncol)          = R_UNDEF
              cospOUT%modis_Ice_Water_Path_Mean(1:ncol)             = R_UNDEF
           endwhere
@@ -2379,6 +2385,7 @@ CONTAINS
        reffclwmodis(1:ncol) = cospOUT%modis_Cloud_Particle_Size_Water_Mean
        reffclimodis(1:ncol) = cospOUT%modis_Cloud_Particle_Size_Ice_Mean
        pctmodis(1:ncol)     = cospOUT%modis_Cloud_Top_Pressure_Total_Mean
+       tctmodis(1:ncol)     = cospOUT%modis_Cloud_Top_Temp_Total_Mean ! JKS
        lwpmodis(1:ncol)     = cospOUT%modis_Liquid_Water_Path_Mean
        iwpmodis(1:ncol)     = cospOUT%modis_Ice_Water_Path_Mean
        clmodis(1:ncol,1:ntau_cosp_modis,1:nprs_cosp)  = cospOUT%modis_Optical_Thickness_vs_Cloud_Top_Pressure 
@@ -2740,6 +2747,13 @@ CONTAINS
           pctmodis(:ncol) = pctmodis(:ncol)*cltmodis(:ncol)
        end where
        call outfld('PCTMODIS',pctmodis    ,pcols,lchnk)
+       where ((tctmodis(:ncol)  .eq. R_UNDEF) .or. ( cltmodis(:ncol) .eq. R_UNDEF))
+          tctmodis(:ncol) = R_UNDEF
+       elsewhere
+          !! weight by the cloud fraction cltmodis
+          tctmodis(:ncol) = tctmodis(:ncol)*cltmodis(:ncol)
+       end where
+       call outfld('TCTMODIS',tctmodis    ,pcols,lchnk) ! JKS   
        
        where ((lwpmodis(:ncol)  .eq. R_UNDEF) .or. (clwmodis(:ncol) .eq. R_UNDEF))
           lwpmodis(:ncol) = R_UNDEF
@@ -3385,6 +3399,7 @@ CONTAINS
        allocate(x%modis_Cloud_Particle_Size_Water_Mean(Npoints))
        allocate(x%modis_Cloud_Particle_Size_Ice_Mean(Npoints))
        allocate(x%modis_Cloud_Top_Pressure_Total_Mean(Npoints))
+       allocate(x%modis_Cloud_Top_Temp_Total_Mean(Npoints)) ! JKS
        allocate(x%modis_Liquid_Water_Path_Mean(Npoints))
        allocate(x%modis_Ice_Water_Path_Mean(Npoints))
        allocate(x%modis_Optical_Thickness_vs_Cloud_Top_Pressure(nPoints,numModisTauBins,numMODISPresBins))
@@ -3695,6 +3710,10 @@ CONTAINS
      if (associated(y%modis_Cloud_Top_Pressure_Total_Mean))                  then
         deallocate(y%modis_Cloud_Top_Pressure_Total_Mean)           
         nullify(y%modis_Cloud_Top_Pressure_Total_Mean)           
+     endif
+     if (associated(y%modis_Cloud_Top_Temp_Total_Mean))                  then
+        deallocate(y%modis_Cloud_Top_Temp_Total_Mean)           
+        nullify(y%modis_Cloud_Top_Temp_Total_Mean)           
      endif
      if (associated(y%modis_Liquid_Water_Path_Mean))                         then
         deallocate(y%modis_Liquid_Water_Path_Mean)     
