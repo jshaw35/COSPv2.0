@@ -1572,10 +1572,14 @@ contains
                 allocate(x % rttov_outputs(i) % channel_indices(rttov_configs(i) % nchan_out))
                 if (rttov_configs(i) % Lrttov_bt) then                              ! Brightness temp
                     allocate(x % rttov_outputs(i) % bt_total_pc(Npoints,rttov_configs(i) % nchan_out))
+                    if (rttov_configs(i) % Lrttov_maskclear) &
+                        allocate(x % rttov_outputs(i) % bt_clear_masked(Npoints,rttov_configs(i) % nchan_out))
         !            if (Lrttov_cld .or. Lrttov_aer) allocate(x%rttov_bt_clear(Npoints,Nchan))
                 end if
                 if (rttov_configs(i) % Lrttov_rad) then                             ! Radiance
                     allocate(x % rttov_outputs(i) % rad_total_pc(Npoints,rttov_configs(i) % nchan_out))
+                    if (rttov_configs(i) % Lrttov_maskclear) &
+                        allocate(x % rttov_outputs(i) % rad_clear_masked(Npoints,rttov_configs(i) % nchan_out))
         !            if (Lrttov_cld .or. Lrttov_aer) allocate(x%rttov_rad_clear(Npoints,Nchan))
         !            if (Lrttov_cld .or. Lrttov_aer) allocate(x%rttov_rad_cloudy(Npoints,Nchan))
                 end if  
@@ -1586,6 +1590,8 @@ contains
                     if ((rttov_configs(i) % Lrttov_cld) .or. (rttov_configs(i) % Lrttov_aer)) then
                         allocate(x % rttov_outputs(i) % bt_clear(Npoints,rttov_configs(i) % nchan_out))
                     end if
+                    if (rttov_configs(i) % Lrttov_maskclear) &
+                        allocate(x % rttov_outputs(i) % bt_clear_masked(Npoints,rttov_configs(i) % nchan_out))
                 end if
                 if (rttov_configs(i) % Lrttov_rad) then                             ! Radiance
                     allocate(x % rttov_outputs(i) % rad_total(Npoints,rttov_configs(i) % nchan_out))
@@ -1595,14 +1601,19 @@ contains
                     if ((rttov_configs(i) % Lrttov_cld) .or. (rttov_configs(i) % Lrttov_aer)) then
                         allocate(x % rttov_outputs(i) % rad_cloudy(Npoints,rttov_configs(i) % nchan_out))
                     end if
+                    if (rttov_configs(i) % Lrttov_maskclear) &
+                        allocate(x % rttov_outputs(i) % rad_clear_masked(Npoints,rttov_configs(i) % nchan_out))
                 end if
                 if (rttov_configs(i) % Lrttov_refl) then                            ! Reflectance
                     allocate(x % rttov_outputs(i) % refl_total(Npoints,rttov_configs(i) % nchan_out))
                     if ((rttov_configs(i) % Lrttov_cld) .or. (rttov_configs(i) % Lrttov_aer)) then
                         allocate(x % rttov_outputs(i) % refl_clear(Npoints,rttov_configs(i) % nchan_out))
                     end if
-                end if    
-            end if         
+                    if (rttov_configs(i) % Lrttov_maskclear) &
+                        allocate(x % rttov_outputs(i) % refl_clear_masked(Npoints,rttov_configs(i) % nchan_out))
+                end if
+            end if
+            if (rttov_configs(i) % Lrttov_maskclear) allocate(x % rttov_outputs(i) % clear_sky_mask(Npoints))
         end do
     else
         x % Ninst_rttov = 0
