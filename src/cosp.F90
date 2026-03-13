@@ -1469,8 +1469,8 @@ CONTAINS
               cospOUT%modis_Cloud_Particle_Size_Ice_Mean(ij:ik) = R_UNDEF
           if (associated(cospOUT%modis_Cloud_Top_Pressure_Total_Mean))                   &
              cospOUT%modis_Cloud_Top_Pressure_Total_Mean(ij:ik) = R_UNDEF
-          if (associated(cospOUT%modis_Cloud_Top_Temp_Total_Mean))                   & ! JKS
-             cospOUT%modis_Cloud_Top_Temp_Total_Mean(ij:ik) = R_UNDEF                       ! JKS
+          if (associated(cospOUT%modis_Cloud_Top_Temp_Total_Mean))                       & ! JKS
+             cospOUT%modis_Cloud_Top_Temp_Total_Mean(ij:ik) = R_UNDEF
           if (associated(cospOUT%modis_Liquid_Water_Path_Mean))                          &
              cospOUT%modis_Liquid_Water_Path_Mean(ij:ik) = R_UNDEF
           if (associated(cospOUT%modis_Ice_Water_Path_Mean))                             &
@@ -2315,7 +2315,7 @@ CONTAINS
                cospOUT%modis_Cloud_Particle_Size_Ice_Mean(:)                = R_UNDEF
           if (associated(cospOUT%modis_Cloud_Top_Pressure_Total_Mean))                      &
                cospOUT%modis_Cloud_Top_Pressure_Total_Mean(:)               = R_UNDEF
-          if (associated(cospOUT%modis_Cloud_Top_Temp_Total_Mean))                      & ! JKS
+          if (associated(cospOUT%modis_Cloud_Top_Temp_Total_Mean))                          & ! JKS
                cospOUT%modis_Cloud_Top_Temp_Total_Mean(:)                   = R_UNDEF
           if (associated(cospOUT%modis_Liquid_Water_Path_Mean))                             &
                cospOUT%modis_Liquid_Water_Path_Mean(:)                      = R_UNDEF
