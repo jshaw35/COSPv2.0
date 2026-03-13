@@ -4954,6 +4954,31 @@ CONTAINS
   end subroutine cosp_errorCheck
 
   !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+  ! SUBROUTINE clean_RTTOV_outputs
+  !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+  subroutine clean_RTTOV_outputs(rttov_outputs)
+    
+    ! Inputs
+    type(rttov_output),intent(inout) :: rttov_outputs
+
+    if (associated(rttov_outputs%channel_indices))      rttov_outputs%channel_indices(:)  = 0
+    if (associated(rttov_outputs%bt_total))             rttov_outputs%bt_total(:,:)       = R_UNDEF
+    if (associated(rttov_outputs%bt_clear))             rttov_outputs%bt_clear(:,:)       = R_UNDEF
+    if (associated(rttov_outputs%rad_total))            rttov_outputs%rad_total(:,:)      = R_UNDEF
+    if (associated(rttov_outputs%rad_clear))            rttov_outputs%rad_clear(:,:)      = R_UNDEF
+    if (associated(rttov_outputs%rad_cloudy))           rttov_outputs%rad_cloudy(:,:)     = R_UNDEF
+    if (associated(rttov_outputs%refl_total))           rttov_outputs%refl_total(:,:)     = R_UNDEF
+    if (associated(rttov_outputs%refl_clear))           rttov_outputs%refl_clear(:,:)     = R_UNDEF
+    if (associated(rttov_outputs%bt_total_pc))          rttov_outputs%bt_total_pc(:,:)    = R_UNDEF
+    if (associated(rttov_outputs%rad_total_pc))         rttov_outputs%rad_total_pc(:,:)   = R_UNDEF
+    if (associated(rttov_outputs%clear_sky_mask))       rttov_outputs%clear_sky_mask(:)   = 0.0_wp
+    if (associated(rttov_outputs%bt_clear_masked))     rttov_outputs%bt_clear_masked(:,:) = R_UNDEF
+    if (associated(rttov_outputs%rad_clear_masked))   rttov_outputs%rad_clear_masked(:,:) = R_UNDEF
+    if (associated(rttov_outputs%refl_clear_masked)) rttov_outputs%refl_clear_masked(:,:) = R_UNDEF
+
+  end subroutine clean_RTTOV_outputs
+
+  !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
   ! END MODULE
   !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 END MODULE MOD_COSP
